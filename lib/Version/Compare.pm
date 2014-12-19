@@ -61,6 +61,125 @@ sub version_compare {
     }
     return 0;
 }
+
+=head2 semver_compare
+
+Compare two semantic version strings as defined by the
+Semantic Versioning spec 2.0.0.
+
+=cut
+sub semver_compare {
+  my $ver1 = shift || 0;
+  my $ver2 = shift || 0;
+
+  print "\n\n$ver1 vs. $ver2\n";
+
+  my $v1 = _parse_semver( $ver1 );
+  my $v2 = _parse_semver( $ver2 );
+
+  foreach my $k (qw(Major Minor Patch)) {
+    if ( int ( $v1->{$k} ) > int( $v2->{$k} ) ) {
+      return 1;
+    }
+    elsif ( int( $v1->{$k} ) < int( $v2->{$k} ) ) {
+      return -1;
+    }
+  }
+  return _semver_prs_compare( $v1->{'PR'}, $v2->{'PR'} );
+}
+
+sub _semver_prs_compare {
+  my $pr1 = shift;
+  my $pr2 = shift;
+
+  if(scalar(@$pr1) == 0 && scalar(@$pr2) == 0) {
+    return 0;
+  } elsif( scalar(@$pr1) == 0 && scalar(@$pr2) > 0) {
+    return 1;
+  } elsif( scalar(@$pr1) > 0 && scalar(@$pr2) == 0) {
+    return -1;
+  } else {
+    my $i = 0;
+
+    PR: for ( ; $i < scalar(@$pr1) && $i < scalar(@$pr2); $i++ ) {
+      my $comp = _semver_pr_compare($pr1->[$i], $pr2->[$i]);
+      if($comp == 0) {
+        next PR;
+      } elsif( $comp == 1 ) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+    if ( $i == scalar(@$pr1) && $i == scalar(@$pr2) ) {
+      return 0;
+    } elsif( $i == scalar(@$pr1) && $i < scalar(@$pr2) ) {
+      return -1;
+    } else {
+      return 1;
+    }
+  }
+}
+
+sub _semver_pr_compare {
+  my $pr1 = shift;
+  my $pr2 = shift;
+
+  my $re = qr/^[0-9]+$/;
+  if ( $pr1 =~ m/^$re$/ && $pr2 !~ m/^$re$/ ) {
+    return -1;
+  } elsif ( $pr1 !~ m/^$re$/ && $pr2 =~ m/^$re$/ ) {
+    return 1;
+  } elsif ( $pr1 =~ m/^$re$/ && $pr2 =~ m/^$re$/ ) {
+    return $pr1 <=> $pr2;
+  } else {
+    return $pr1 cmp $pr2;
+  }
+}
+
+sub _parse_semver {
+  my $sv = shift;
+
+  my $vp = {};
+  # [0] -> Major
+  # [1] -> Minor
+  # [2] -> Patch+PR+Meta
+  my @v = split /\./, $sv, 3;
+  if(scalar(@v) < 3) {
+    die("Invalid version string!");
+  }
+  $vp->{'Major'} = $v[0];
+  $vp->{'Minor'} = $v[1];
+
+  my ($patch, $pr, $build);
+  if( $v[2] =~ m/\+-/ ) {
+    ( $patch, $pr, $build ) = split /[+-]/, $v[2];
+  } elsif( $v[2] =~ m/\+/ ) {
+    ( $patch, $build ) = split /[+]/, $v[2];
+  } elsif( $v[2] =~ m/-/ ) {
+    ( $patch, $pr ) = split /[-]/, $v[2];
+  } else {
+    $patch = $v[2];
+  }
+  $vp->{'Patch'} = $patch;
+  $vp->{'PR'} = _parse_semver_pr( $pr );
+
+  if ( $build ) {
+    $vp->{'Build'} = $build;
+  }
+
+  return $vp;
+}
+
+sub _parse_semver_pr {
+  my $pr = shift;
+
+  return [] if !$pr;
+  return [] if length($pr) < 1;
+
+  my @prs = split /\./, $pr;
+  return \@prs;
+}
 ## use critic
 
 =head2 cmp
