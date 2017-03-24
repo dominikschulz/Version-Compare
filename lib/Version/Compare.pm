@@ -72,8 +72,6 @@ sub semver_compare {
   my $ver1 = shift || 0;
   my $ver2 = shift || 0;
 
-  print "\n\n$ver1 vs. $ver2\n";
-
   my $v1 = _parse_semver( $ver1 );
   my $v2 = _parse_semver( $ver2 );
 
